@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CINÉ-GENESIS</title>
+<style>
+  body { font-family: -apple-system, sans-serif; background: #111; color: #eee; padding: 15px; }
+  h1 { font-size: 24px; color: #ff0055; }
+  button { background: #ff0055; color: white; border: none; padding: 12px; border-radius: 8px; font-size: 16px; margin: 5px 0; width: 100%; font-weight: bold; }
+  button:disabled { background: #555; }
+  .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #ff0055; }
+  .log { font-size: 12px; color: #aaa; font-family: monospace; max-height: 150px; overflow-y: auto; margin-top: 20px; background: #000; padding: 10px; }
+</style>
+</head>
+<body>
+  <h1>CINÉ-GENESIS</h1>
+  <div id="app">
+    <div class="card">
+      <h3 id="status-title">Aucun projet</h3>
+      <p id="status-desc">Prêt à créer votre premier film.</p>
+    </div>
+    
+    <button id="btn-create" onclick="createProject()">1. Créer un nouveau film (Simulation)</button>
+    <button id="btn-run" onclick="runAllPipeline()" disabled>2. Lancer la génération IA</button>
+    
+    <div id="progress" class="card" style="display:none;">
+      <h4 style="margin-top:0;">État des tiroirs :</h4>
+      <ul id="progress-list"></ul>
+    </div>
+
+    <div class="log" id="console-log">> Système prêt.</div>
+  </div>
+
+<script type="module">
+const DB_NAME = 'cine-genesis';
+const DB_VERSION = 1;
+let _db = null;
+
+function openDB() {
+  if (_db) return Promise.resolve(_db);
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (e.oldVersion < 1) {
+        db.createObjectStore('sessions', { keyPath: 'id' });
+        db.createObjectStore('characters', { keyPath: 'id' });
+        const sc = db.createObjectStore('scenes', { keyPath: 'id' });
+        sc.createIndex('by_sessionId', 'sessionId');
+        const p = db.createObjectStore('plans', { keyPath: 'id' });
+        p.createIndex('by_sessionId', 'sessionId');
+        db.createObjectStore('logs', { keyPath: 'id', autoIncrement: true });
+      }
+    };
+    req.onsuccess = () => { _db = req.result; resolve(_db); };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+const _reqP = (r) => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const db = {
+  get: (store, key) => openDB().then(d => _reqP(d.transaction(store).objectStore(store).get(key))),
+  put: (store, val) => openDB().then(d => _reqP(d.transaction(store, 'readwrite').objectStore(store).put(val))),
+  getAll: (store) => openDB().then(d => _reqP(d.transaction(store).objectStore(store).getAll())),
+  byIndex: (store, idx, key) => openDB().then(d => _reqP(d.transaction(store).objectStore(store).index(idx).getAll(key))),
+};
+
+const STATUS = { PENDING: 'pending', RUNNING: 'running', DONE: 'done' };
+const consoleLog = (msg) => {
+  const el = document.getElementById('console-log');
+  el.innerHTML += `<br>> ${msg}`;
+  el.scrollTop = el.scrollHeight;
+};
+
+async function recomputeStage(sessionId) {
+  const chars = await db.byIndex('characters', 'by_sessionId', sessionId);
+  if (chars.length === 0 || chars.some(c => c.status !== STATUS.DONE)) return 'characters';
+  
+  const scenes = await db.byIndex('scenes', 'by_sessionId', sessionId);
+  if (scenes.length === 0 || scenes.some(s => s.status !== STATUS.DONE)) return 'scenes';
+  
+  const plans = await db.byIndex('plans', 'by_sessionId', sessionId);
+  if (plans.length === 0 || plans.some(p => p.status !== STATUS.DONE)) return 'plans';
+  
+  return 'done';
+}
+
+async function updateUI(sessionId) {
+  const stage = await recomputeStage(sessionId);
+  document.getElementById('status-desc').innerText = `Étape actuelle : ${stage.toUpperCase()}`;
+  
+  const list = document.getElementById('progress-list');
+  list.innerHTML = '';
+  
+  const chars = await db.byIndex('characters', 'by_sessionId', sessionId);
+  chars.forEach(c => list.innerHTML += `<li>Perso: ${c.name} - ${c.status}</li>`);
+  
+  const scenes = await db.byIndex('scenes', 'by_sessionId', sessionId);
+  scenes.forEach(s => list.innerHTML += `<li>Scène: ${s.title} - ${s.status}</li>`);
+  
+  const plans = await db.byIndex('plans', 'by_sessionId', sessionId);
+  plans.forEach(p => list.innerHTML += `<li>Plan: ${p.shotType} - ${p.status}</li>`);
+}
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function apiGenerateText(prompt) {
+  consoleLog(`Appel API Texte (Gemini) : "${prompt.substring(0,20)}..."`);
+  await sleep(1000);
+  return "Ceci est un texte généré par l'IA.";
+}
+
+async function apiGenerateImage(prompt) {
+  consoleLog(`Appel API Image (Nano Banana) : "${prompt.substring(0,20)}..."`);
+  await sleep(1500);
+  return "blob_simule_image";
+}
+
+let currentSessionId = null;
+
+window.createProject = async () => {
+  document.getElementById('btn-create').disabled = true;
+  document.getElementById('btn-run').disabled = false;
+  document.getElementById('progress').style.display = 'block';
+  
+  currentSessionId = crypto.randomUUID();
+  consoleLog("Création de la session : " + currentSessionId);
+  
+  await db.put('sessions', { id: currentSessionId, title: "Mon Film", genre: "cyberpunk", createdAt: Date.now() });
+  
+  await db.put('characters', { id: crypto.randomUUID(), sessionId: currentSessionId, name: "Néo", status: STATUS.PENDING });
+  await db.put('characters', { id: crypto.randomUUID(), sessionId: currentSessionId, name: "Trinity", status: STATUS.PENDING });
+  
+  await db.put('scenes', { id: crypto.randomUUID(), sessionId: currentSessionId, title: "La pluie", status: STATUS.PENDING });
+  await db.put('scenes', { id: crypto.randomUUID(), sessionId: currentSessionId, title: "Le combat", status: STATUS.PENDING });
+  
+  const sceneId = (await db.byIndex('scenes', 'by_sessionId', currentSessionId))[0].id;
+  await db.put('plans', { id: crypto.randomUUID(), sessionId: currentSessionId, sceneId: sceneId, shotType: "Plan large", status: STATUS.PENDING });
+  
+  document.getElementById('status-title').innerText = "Projet créé !";
+  await updateUI(currentSessionId);
+};
+
+window.runAllPipeline = async () => {
+  document.getElementById('btn-run').disabled = true;
+  consoleLog("--- Démarrage de la génération ---");
+  
+  const chars = await db.byIndex('characters', 'by_sessionId', currentSessionId);
+  for (let c of chars) {
+    if (c.status === STATUS.PENDING) {
+      c.status = STATUS.RUNNING; await db.put('characters', c); await updateUI(currentSessionId);
+      c.text = await apiGenerateText("Fiche perso de " + c.name);
+      c.image = await apiGenerateImage("Portrait de " + c.name);
+      c.status = STATUS.DONE; await db.put('characters', c); await updateUI(currentSessionId);
+    }
+  }
+  
+  const scenes = await db.byIndex('scenes', 'by_sessionId', currentSessionId);
+  for (let s of scenes) {
+    if (s.status === STATUS.PENDING) {
+      s.status = STATUS.RUNNING; await db.put('scenes', s); await updateUI(currentSessionId);
+      s.image = await apiGenerateImage("Décor : " + s.title);
+      s.status = STATUS.DONE; await db.put('scenes', s); await updateUI(currentSessionId);
+    }
+  }
+  
+  const plans = await db.byIndex('plans', 'by_sessionId', currentSessionId);
+  for (let p of plans) {
+    if (p.status === STATUS.PENDING) {
+      p.status = STATUS.RUNNING; await db.put('plans', p); await updateUI(currentSessionId);
+      p.image = await apiGenerateImage("Plan : " + p.shotType);
+      p.status = STATUS.DONE; await db.put('plans', p); await updateUI(currentSessionId);
+    }
+  }
+
+  consoleLog("--- Génération terminée ! ---");
+  document.getElementById('btn-run').disabled = false;
+  await updateUI(currentSessionId);
+};
+</script>
+</body>
+</html>
