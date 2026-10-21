@@ -74,7 +74,8 @@ const consoleLog = (msg) => {
 };
 
 async function recomputeStage(sessionId) {
-  const chars = await db.byIndex('characters', 'by_sessionId', sessionId);
+  const allChars = await db.getAll('characters');
+  const chars = allChars.filter(c => c.sessionId === sessionId);
   if (chars.length === 0 || chars.some(c => c.status !== STATUS.DONE)) return 'characters';
   
   const scenes = await db.byIndex('scenes', 'by_sessionId', sessionId);
@@ -93,7 +94,8 @@ async function updateUI(sessionId) {
   const list = document.getElementById('progress-list');
   list.innerHTML = '';
   
-  const chars = await db.byIndex('characters', 'by_sessionId', sessionId);
+  const allChars = await db.getAll('characters');
+  const chars = allChars.filter(c => c.sessionId === sessionId);
   chars.forEach(c => list.innerHTML += `<li>Perso: ${c.name} - ${c.status}</li>`);
   
   const scenes = await db.byIndex('scenes', 'by_sessionId', sessionId);
@@ -106,15 +108,15 @@ async function updateUI(sessionId) {
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 async function apiGenerateText(prompt) {
-  consoleLog(`Appel API Texte (Gemini) : "${prompt.substring(0,20)}..."`);
+  consoleLog(`API Texte : "${prompt.substring(0,20)}..."`);
   await sleep(1000);
-  return "Ceci est un texte généré par l'IA.";
+  return "Texte généré.";
 }
 
 async function apiGenerateImage(prompt) {
-  consoleLog(`Appel API Image (Nano Banana) : "${prompt.substring(0,20)}..."`);
+  consoleLog(`API Image : "${prompt.substring(0,20)}..."`);
   await sleep(1500);
-  return "blob_simule_image";
+  return "image_simulee";
 }
 
 let currentSessionId = null;
@@ -146,7 +148,8 @@ window.runAllPipeline = async () => {
   document.getElementById('btn-run').disabled = true;
   consoleLog("--- Démarrage de la génération ---");
   
-  const chars = await db.byIndex('characters', 'by_sessionId', currentSessionId);
+  const allChars = await db.getAll('characters');
+  const chars = allChars.filter(c => c.sessionId === currentSessionId);
   for (let c of chars) {
     if (c.status === STATUS.PENDING) {
       c.status = STATUS.RUNNING; await db.put('characters', c); await updateUI(currentSessionId);
