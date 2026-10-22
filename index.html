@@ -12,7 +12,6 @@
   .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #ff0055; }
   .log { font-size: 12px; color: #aaa; font-family: monospace; max-height: 150px; overflow-y: auto; margin-top: 20px; background: #000; padding: 10px; }
   input { width: 90%; padding: 10px; border-radius: 5px; border: none; background: #333; color: white; margin-top: 5px; font-size: 16px; }
-  
   ul { padding-left: 0; }
   li { list-style-type: none; background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
   .item-title { font-weight: bold; color: #ff0055; font-size: 16px; margin-bottom: 5px; }
@@ -145,7 +144,7 @@ async function apiGenerateText(prompt) {
   const timeoutId = setTimeout(() => controller.abort(), 15000);
 
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${key}`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
@@ -166,7 +165,9 @@ async function apiGenerateText(prompt) {
 }
 
 async function apiGenerateImage(prompt) {
-  consoleLog(`[Pollinations] Dessin en cours...`);
+  consoleLog(`[Pollinations] Dessin... (15s d'attente)`);
+  await new Promise(r => setTimeout(r, 15000)); // Pause anti-blocage
+  
   const seed = Math.floor(Math.random() * 1000000);
   const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=450&nologo=true&seed=${seed}`;
   return imageUrl;
