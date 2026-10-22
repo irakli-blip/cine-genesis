@@ -2,8 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=
-device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CINÉ-GENESIS</title>
 <style>
   body { font-family: -apple-system, sans-serif; background: #111; color: #eee; padding: 15px; }
@@ -47,6 +46,7 @@ device-width, initial-scale=1">
   </div>
 
 <script type="module">
+// --- GESTION DE LA CLÉ API ---
 window.saveApiKey = () => {
   const key = document.getElementById('api-key').value;
   localStorage.setItem('gemini_api_key', key);
@@ -54,6 +54,7 @@ window.saveApiKey = () => {
 };
 document.getElementById('api-key').value = localStorage.getItem('gemini_api_key') || '';
 
+// --- BASE DE DONNÉES (TIROIRS) ---
 const DB_NAME = 'cine-genesis';
 const DB_VERSION = 1;
 let _db = null;
@@ -87,6 +88,7 @@ const db = {
   byIndex: (store, idx, key) => openDB().then(d => _reqP(d.transaction(store).objectStore(store).index(idx).getAll(key))),
 };
 
+// --- OUTILS ET LOGIQUE ---
 const STATUS = { PENDING: 'pending', RUNNING: 'running', DONE: 'done' };
 const consoleLog = (msg) => {
   const el = document.getElementById('console-log');
@@ -135,6 +137,7 @@ async function updateUI(sessionId) {
   plans.forEach(p => list.innerHTML += renderItem('Plan', p.shotType, p.status, p.text, p.image));
 }
 
+// --- APPELS API ---
 async function apiGenerateText(prompt) {
   const key = localStorage.getItem('gemini_api_key');
   if (!key) throw new Error("Clé API manquante");
@@ -145,7 +148,7 @@ async function apiGenerateText(prompt) {
   const timeoutId = setTimeout(() => controller.abort(), 15000);
 
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
@@ -158,22 +161,20 @@ async function apiGenerateText(prompt) {
     return data.candidates[0].content.parts[0].text;
   } catch (err) {
     clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
-      throw new Error("Le serveur de Google met trop de temps à répondre.");
-    }
+    if (err.name === 'AbortError') throw new Error("Délai dépassé.");
     throw err;
   }
 }
 
 async function apiGenerateImage(prompt) {
-  consoleLog(`[Pollinations] Dessin... (15s d'attente)`);
-  await new Promise(r => setTimeout(r, 15000)); // Pause anti-blocage
+  consoleLog(`[Pollinations] Dessin (6s d'attente)...`);
+  await new Promise(r => setTimeout(r, 6000));
   
   const seed = Math.floor(Math.random() * 1000000);
-  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=450&nologo=true&seed=${seed}`;
-  return imageUrl;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=450&nologo=true&seed=${seed}`;
 }
 
+// --- LOGIQUE DE L'APPLICATION ---
 let currentSessionId = null;
 
 window.createProject = async () => {
@@ -182,7 +183,7 @@ window.createProject = async () => {
   document.getElementById('progress').style.display = 'block';
   
   currentSessionId = crypto.randomUUID();
-  consoleLog("Création de la session : " + currentSessionId);
+  consoleLog("Nouvelle session : " + currentSessionId);
   
   await db.put('sessions', { id: currentSessionId, title: "Mon Film", genre: "cyberpunk", createdAt: Date.now() });
   
@@ -202,7 +203,7 @@ window.createProject = async () => {
 window.runAllPipeline = async () => {
   const key = localStorage.getItem('gemini_api_key');
   if (!key) {
-    alert("N'oublie pas de coller ta clé API Google en haut de la page !");
+    alert("N'oublie pas de coller ta clé API Google !");
     return;
   }
 
@@ -215,9 +216,15 @@ window.runAllPipeline = async () => {
     for (let c of chars) {
       if (c.status === STATUS.PENDING) {
         c.status = STATUS.RUNNING; await db.put('characters', c); await updateUI(currentSessionId);
-        c.text = await apiGenerateText("Décris le personnage de film cyberpunk " + c.name + " en 2 phrases.");
-        c.image = await apiGenerateImage("Portrait cinématographique de " + c.name + ", style cyberpunk, néons, haute qualité");
-        c.status = STATUS.DONE; await db.put('characters', c); await updateUI(currentSessionId);
+        try {
+          c.text = await apiGenerateText("Décris le personnage de film cyberpunk " + c.name + " en 2 phrases.");
+          c.image = await apiGenerateImage("Portrait cinématographique de " + c.name + ", style cyberpunk, néons");
+          c.status = STATUS.DONE; 
+        } catch(e) {
+          consoleLog(`Erreur sur ${c.name}: ${e.message}`);
+          c.status = STATUS.DONE;
+        }
+        await db.put('characters', c); await updateUI(currentSessionId);
       }
     }
     
@@ -225,9 +232,15 @@ window.runAllPipeline = async () => {
     for (let s of scenes) {
       if (s.status === STATUS.PENDING) {
         s.status = STATUS.RUNNING; await db.put('scenes', s); await updateUI(currentSessionId);
-        s.text = await apiGenerateText("Décris le décor de cette scène cyberpunk : " + s.title);
-        s.image = await apiGenerateImage("Décor de cinéma cyberpunk : " + s.title + ", sombre, pluie, lumières rouges");
-        s.status = STATUS.DONE; await db.put('scenes', s); await updateUI(currentSessionId);
+        try {
+          s.text = await apiGenerateText("Décris le décor de cette scène cyberpunk : " + s.title);
+          s.image = await apiGenerateImage("Décor de cinéma cyberpunk : " + s.title + ", sombre, pluie");
+          s.status = STATUS.DONE;
+        } catch(e) {
+          consoleLog(`Erreur sur ${s.title}: ${e.message}`);
+          s.status = STATUS.DONE;
+        }
+        await db.put('scenes', s); await updateUI(currentSessionId);
       }
     }
     
@@ -235,15 +248,20 @@ window.runAllPipeline = async () => {
     for (let p of plans) {
       if (p.status === STATUS.PENDING) {
         p.status = STATUS.RUNNING; await db.put('plans', p); await updateUI(currentSessionId);
-        p.image = await apiGenerateImage("Image de film cyberpunk. Type de plan : " + p.shotType);
-        p.status = STATUS.DONE; await db.put('plans', p); await updateUI(currentSessionId);
+        try {
+          p.image = await apiGenerateImage("Image de film cyberpunk. Type de plan : " + p.shotType);
+          p.status = STATUS.DONE;
+        } catch(e) {
+          consoleLog(`Erreur sur le plan: ${e.message}`);
+          p.status = STATUS.DONE;
+        }
+        await db.put('plans', p); await updateUI(currentSessionId);
       }
     }
 
-    consoleLog("--- 🎬 GÉNÉRATION TERMINÉE AVEC SUCCÈS ! ---");
+    consoleLog("--- 🎬 GÉNÉRATION TERMINÉE ! ---");
   } catch (err) {
-    consoleLog("❌ ERREUR : " + err.message);
-    alert("Erreur API : " + err.message);
+    consoleLog("❌ ERREUR GLOBALE : " + err.message);
   }
   
   document.getElementById('btn-run').disabled = false;
