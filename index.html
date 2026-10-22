@@ -10,8 +10,15 @@
   button { background: #ff0055; color: white; border: none; padding: 12px; border-radius: 8px; font-size: 16px; margin: 5px 0; width: 100%; font-weight: bold; }
   button:disabled { background: #555; }
   .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #ff0055; }
-  .log { font-size: 12px; color: #aaa; font-family: monospace; max-height: 200px; overflow-y: auto; margin-top: 20px; background: #000; padding: 10px; }
+  .log { font-size: 12px; color: #aaa; font-family: monospace; max-height: 150px; overflow-y: auto; margin-top: 20px; background: #000; padding: 10px; }
   input { width: 90%; padding: 10px; border-radius: 5px; border: none; background: #333; color: white; margin-top: 5px; font-size: 16px; }
+  
+  /* Nouveau style pour le storyboard */
+  ul { padding-left: 0; }
+  li { list-style-type: none; background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
+  .item-title { font-weight: bold; color: #ff0055; font-size: 16px; margin-bottom: 5px; }
+  .item-text { font-size: 14px; color: #ccc; margin-bottom: 10px; font-style: italic; }
+  .item-image { width: 100%; border-radius: 5px; margin-top: 5px; background: #000; min-height: 100px; }
 </style>
 </head>
 <body>
@@ -33,7 +40,7 @@
     <button id="btn-run" onclick="runAllPipeline()" disabled>2. Lancer la génération IA</button>
     
     <div id="progress" class="card" style="display:none;">
-      <h4 style="margin-top:0;">État des tiroirs :</h4>
+      <h4 style="margin-top:0;">Storyboard du film :</h4>
       <ul id="progress-list"></ul>
     </div>
 
@@ -102,6 +109,16 @@ async function recomputeStage(sessionId) {
   return 'done';
 }
 
+// Nouvelle fonction pour créer une jolie carte visuelle
+function renderItem(type, name, status, text, imageUrl) {
+  let html = `<li>`;
+  html += `<div class="item-title">${type}: ${name} ${status === 'done' ? '✅' : '⏳'}</div>`;
+  if (text) html += `<div class="item-text">"${text}"</div>`;
+  if (imageUrl) html += `<img src="${imageUrl}" class="item-image" loading="lazy" alt="${name}">`;
+  html += `</li>`;
+  return html;
+}
+
 async function updateUI(sessionId) {
   const stage = await recomputeStage(sessionId);
   document.getElementById('status-desc').innerText = `Étape actuelle : ${stage.toUpperCase()}`;
@@ -111,43 +128,49 @@ async function updateUI(sessionId) {
   
   const allChars = await db.getAll('characters');
   const chars = allChars.filter(c => c.sessionId === sessionId);
-  chars.forEach(c => list.innerHTML += `<li>Perso: ${c.name} - ${c.status} ${c.image ? '🖼️' : ''}</li>`);
+  chars.forEach(c => list.innerHTML += renderItem('Personnage', c.name, c.status, c.text, c.image));
   
   const scenes = await db.byIndex('scenes', 'by_sessionId', sessionId);
-  scenes.forEach(s => list.innerHTML += `<li>Scène: ${s.title} - ${s.status} ${s.image ? '🖼️' : ''}</li>`);
+  scenes.forEach(s => list.innerHTML += renderItem('Scène', s.title, s.status, s.text, s.image));
   
   const plans = await db.byIndex('plans', 'by_sessionId', sessionId);
-  plans.forEach(p => list.innerHTML += `<li>Plan: ${p.shotType} - ${p.status} ${p.image ? '🖼️' : ''}</li>`);
+  plans.forEach(p => list.innerHTML += renderItem('Plan', p.shotType, p.status, p.text, p.image));
 }
-
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 async function apiGenerateText(prompt) {
   const key = localStorage.getItem('gemini_api_key');
   if (!key) throw new Error("Clé API manquante");
   
-  consoleLog(`[Gemini] Écriture : "${prompt.substring(0,20)}..."`);
+  consoleLog(`[Gemini] Écriture...`);
   
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${key}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-  });
-  
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  return data.candidates[0].content.parts[0].text;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    return data.candidates[0].content.parts[0].text;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error("Le serveur de Google met trop de temps à répondre.");
+    }
+    throw err;
+  }
 }
 
-// NOUVELLE FONCTION IMAGE : Pollinations AI (gratuit, sans clé)
 async function apiGenerateImage(prompt) {
-  consoleLog(`[Pollinations] Dessin : "${prompt.substring(0,20)}..."`);
-  
-  // On encode le prompt pour l'URL et on ajoute un paramètre pour éviter le cache
+  consoleLog(`[Pollinations] Dessin en cours...`);
   const seed = Math.floor(Math.random() * 1000000);
-  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=576&nologo=true&seed=${seed}`;
-  
-  // On renvoie directement l'URL de l'image
+  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=450&nologo=true&seed=${seed}`;
   return imageUrl;
 }
 
@@ -184,7 +207,7 @@ window.runAllPipeline = async () => {
   }
 
   document.getElementById('btn-run').disabled = true;
-  consoleLog("--- Démarrage de la VRAIE génération IA ---");
+  consoleLog("--- Démarrage de la génération ---");
   
   try {
     const allChars = await db.getAll('characters');
@@ -202,6 +225,7 @@ window.runAllPipeline = async () => {
     for (let s of scenes) {
       if (s.status === STATUS.PENDING) {
         s.status = STATUS.RUNNING; await db.put('scenes', s); await updateUI(currentSessionId);
+        s.text = await apiGenerateText("Décris le décor de cette scène cyberpunk : " + s.title);
         s.image = await apiGenerateImage("Décor de cinéma cyberpunk : " + s.title + ", sombre, pluie, lumières rouges");
         s.status = STATUS.DONE; await db.put('scenes', s); await updateUI(currentSessionId);
       }
