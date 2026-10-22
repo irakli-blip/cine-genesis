@@ -136,7 +136,7 @@ async function apiGenerateText(prompt) {
 
 async function apiGenerateImage(prompt) {
   consoleLog(`[Pollinations] Dessin (pause anti-blocage)...`);
-  await new Promise(r => setTimeout(r, 7000)); // Pause de 7 secondes
+  await new Promise(r => setTimeout(r, 45000)); // Pause de 7 secondes
   const seed = Math.floor(Math.random() * 1000000);
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=450&nologo=true&seed=${seed}`;
 }
