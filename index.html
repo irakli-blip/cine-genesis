@@ -11,7 +11,6 @@
   button:disabled { background: #555; }
   .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #ff0055; }
   .log { font-size: 12px; color: #aaa; font-family: monospace; max-height: 150px; overflow-y: auto; margin-top: 20px; background: #000; padding: 10px; }
-  input { width: 90%; padding: 10px; border-radius: 5px; border: none; background: #333; color: white; margin-top: 5px; font-size: 16px; }
   ul { padding-left: 0; }
   li { list-style-type: none; background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
   .item-title { font-weight: bold; color: #ff0055; font-size: 16px; margin-bottom: 5px; }
@@ -22,12 +21,6 @@
 <body>
   <h1>CINÉ-GENESIS</h1>
   
-  <div class="card">
-    <h4 style="margin-top:0;">Clé API Google Gemini</h4>
-    <input type="password" id="api-key" placeholder="Colle ta clé AIza... ici" onchange="saveApiKey()">
-    <p style="font-size:12px; color:#aaa;">Ta clé est sauvegardée uniquement sur ton téléphone.</p>
-  </div>
-
   <div id="app">
     <div class="card">
       <h3 id="status-title">Aucun projet</h3>
@@ -46,14 +39,6 @@
   </div>
 
 <script type="module">
-// --- GESTION DE LA CLÉ API ---
-window.saveApiKey = () => {
-  const key = document.getElementById('api-key').value;
-  localStorage.setItem('gemini_api_key', key);
-  consoleLog("Clé API enregistrée !");
-};
-document.getElementById('api-key').value = localStorage.getItem('gemini_api_key') || '';
-
 // --- BASE DE DONNÉES (TIROIRS) ---
 const DB_NAME = 'cine-genesis';
 const DB_VERSION = 1;
@@ -137,41 +122,21 @@ async function updateUI(sessionId) {
   plans.forEach(p => list.innerHTML += renderItem('Plan', p.shotType, p.status, p.text, p.image));
 }
 
-// --- APPELS API ---
+// --- APPELS API (100% POLLINATIONS, SANS CLÉ API) ---
 async function apiGenerateText(prompt) {
-  const key = localStorage.getItem('gemini_api_key');
-  if (!key) throw new Error("Clé API manquante");
-  
-  consoleLog(`[Gemini] Écriture...`);
-  
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
-
+  consoleLog(`[Pollinations] Écriture...`);
   try {
-    // Utilisation du tout dernier modèle stable : gemini-2.0-flash
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${key}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-    
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-    return data.candidates[0].content.parts[0].text;
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err.name === 'AbortError') throw new Error("Délai dépassé.");
-    throw err;
+    const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(prompt)}`);
+    if (!res.ok) throw new Error("Erreur serveur texte");
+    return await res.text();
+  } catch(e) {
+    throw new Error("Impossible de générer le texte.");
   }
 }
 
 async function apiGenerateImage(prompt) {
-  consoleLog(`[Pollinations] Dessin (6s d'attente)...`);
-  // Pause anti-blocage
-  await new Promise(r => setTimeout(r, 6000));
-  
+  consoleLog(`[Pollinations] Dessin (pause anti-blocage)...`);
+  await new Promise(r => setTimeout(r, 7000)); // Pause de 7 secondes
   const seed = Math.floor(Math.random() * 1000000);
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=450&nologo=true&seed=${seed}`;
 }
@@ -203,12 +168,6 @@ window.createProject = async () => {
 };
 
 window.runAllPipeline = async () => {
-  const key = localStorage.getItem('gemini_api_key');
-  if (!key) {
-    alert("N'oublie pas de coller ta clé API Google !");
-    return;
-  }
-
   document.getElementById('btn-run').disabled = true;
   consoleLog("--- Démarrage de la génération ---");
   
