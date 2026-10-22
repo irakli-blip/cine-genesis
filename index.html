@@ -1,233 +1,399 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CINÉ-GENESIS</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Générateur Vidéo — Prompts Structurés</title>
 <style>
-  body { font-family: -apple-system, sans-serif; background: #111; color: #eee; padding: 15px; }
-  h1 { font-size: 24px; color: #ff0055; }
-  button { background: #ff0055; color: white; border: none; padding: 12px; border-radius: 8px; font-size: 16px; margin: 5px 0; width: 100%; font-weight: bold; }
-  button:disabled { background: #555; }
-  .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #ff0055; }
-  .log { font-size: 12px; color: #aaa; font-family: monospace; max-height: 150px; overflow-y: auto; margin-top: 20px; background: #000; padding: 10px; }
-  ul { padding-left: 0; }
-  li { list-style-type: none; background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
-  .item-title { font-weight: bold; color: #ff0055; font-size: 16px; margin-bottom: 5px; }
-  .item-text { font-size: 14px; color: #ccc; margin-bottom: 10px; font-style: italic; }
-  .item-image { width: 100%; border-radius: 5px; margin-top: 5px; background: #000; min-height: 100px; }
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+--bg:#0a0a12;--bg2:#12121c;--bg3:#1a1a28;
+--panel:#16161f;--border:#2a2a3a;
+--ink:#e8e6e0;--dim:#8a8896;--faint:#4a4858;
+--acc:#e5c15a;--acc2:#e87b35;
+--ok:#4a9d6a;--err:#c85a4a;--warn:#d4a017;
+--r:6px;--fs:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
+--fm:ui-monospace,'SF Mono',Menlo,monospace;
+}
+html,body{background:var(--bg)}
+body{font-family:var(--fs);background:var(--bg);color:var(--ink);min-height:100vh;padding:1.5rem 1rem 24rem;font-size:15px;line-height:1.55;max-width:1100px;margin:0 auto}
+header{margin-bottom:1.2rem;text-align:center;padding:1rem 0 1.4rem;position:relative}
+header::after{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:180px;height:1px;background:linear-gradient(90deg,transparent,var(--acc),transparent);opacity:.5}
+h1{font-size:1.9rem;font-weight:300;margin-bottom:.4rem;background:linear-gradient(135deg,var(--acc2),var(--acc));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{font-size:.85rem;color:var(--dim);font-style:italic}
+.toast{position:fixed;top:1.5rem;left:50%;transform:translateX(-50%) translateY(-120px);background:var(--bg3);color:var(--ink);border:1px solid var(--border);border-left:3px solid var(--acc);padding:.85rem 1.4rem;border-radius:var(--r);font-size:.85rem;box-shadow:0 8px 32px rgba(0,0,0,.6);z-index:1000;opacity:0;transition:transform .35s cubic-bezier(.2,.9,.3,1.2),opacity .35s;max-width:90vw;text-align:center;display:flex;align-items:center;gap:.6rem}
+.toast.visible{transform:translateX(-50%) translateY(0);opacity:1}
+.toast.success{border-left-color:var(--ok)}.toast.error{border-left-color:var(--err)}.toast.warn{border-left-color:var(--warn)}
+.banner{background:var(--panel);border:1px solid var(--border);border-left:2px solid var(--acc);padding:1rem 1.15rem;border-radius:var(--r);font-size:.8rem;color:var(--dim);margin-bottom:1.2rem;line-height:1.6}
+.banner strong{color:var(--ink)}.banner .hl{color:var(--acc)}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:1.2rem 1.3rem;margin-bottom:1rem}
+.panel.ok{box-shadow:inset 3px 0 0 var(--ok)}
+input[type=password],input[type=text],textarea{width:100%;padding:.85rem 1rem;border-radius:var(--r);border:1px solid var(--border);background:var(--bg2);color:var(--ink);font-family:var(--fm);font-size:.78rem;margin-bottom:.6rem}
+textarea{resize:vertical;min-height:70px;line-height:1.5;font-family:var(--fs);font-size:.85rem}
+input:focus,textarea:focus{outline:none;border-color:var(--acc)}
+.btn{width:100%;padding:.85rem 1.2rem;border-radius:var(--r);border:1px solid var(--border);background:var(--bg2);color:var(--ink);font-size:.85rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;margin-bottom:.7rem;transition:all .2s;font-family:inherit}
+.btn:hover:not(:disabled){background:var(--bg3);border-color:var(--acc)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn-primary{border-color:var(--acc);background:linear-gradient(135deg,rgba(232,123,53,.2),rgba(229,193,90,.15));color:var(--acc);font-size:1.05rem;padding:1.3rem;letter-spacing:.2em}
+.btn-stop{border-color:var(--err);color:var(--err);background:transparent;display:none}
+.btn-stop.visible{display:block}
+.status{font-size:.75rem;padding:.6rem .9rem;border-radius:var(--r);margin-bottom:.5rem;display:flex;align-items:center;gap:.6rem;background:var(--bg2);color:var(--dim);border:1px solid var(--border)}
+.status.ok{background:rgba(74,157,106,.08);color:var(--ok);border-color:rgba(74,157,106,.3)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--faint);flex-shrink:0}
+.status.ok .dot{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.hint{font-size:.72rem;color:var(--dim);margin-top:.5rem}
+.hint a{color:var(--acc);text-decoration:none}
+.keys-list{margin-top:.7rem}
+.key-row{padding:.4rem .7rem;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:.35rem;display:flex;justify-content:space-between;align-items:center;gap:.5rem;font-family:var(--fm);font-size:.72rem}
+.key-row .key-id{color:var(--acc);font-weight:600;letter-spacing:.03em}
+.key-row .key-state{font-size:.62rem;padding:.15rem .5rem;border-radius:2px;background:rgba(74,157,106,.15);color:var(--ok);border:1px solid rgba(74,157,106,.3);letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+.key-row .key-state.cool{background:rgba(212,160,23,.15);color:var(--warn);border-color:rgba(212,160,23,.3)}
+.key-row .key-state.dead{background:rgba(200,90,74,.15);color:var(--err);border-color:rgba(200,90,74,.3)}
+.section{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);margin-bottom:1rem;overflow:hidden}
+.section-header{padding:1rem 1.2rem;cursor:pointer;user-select:none;display:flex;justify-content:space-between;align-items:center}
+.section-title{font-size:.85rem;text-transform:uppercase;letter-spacing:.2em;color:var(--ink);font-weight:500;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.badge{display:inline-block;padding:.15rem .55rem;background:transparent;color:var(--acc);border:1px solid var(--border);border-radius:2px;font-size:.6rem;letter-spacing:.15em;font-weight:600}
+.chevron{font-size:.7rem;color:var(--faint);transition:transform .3s}
+.section.open .chevron{transform:rotate(180deg);color:var(--acc)}
+.section-body{max-height:0;overflow:hidden;transition:max-height .4s ease}
+.section.open .section-body{max-height:12000px}
+.section-content{padding:0 1.2rem 1.2rem}
+.row{margin-bottom:1rem}
+.label{display:block;font-size:.72rem;color:var(--dim);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.15em;font-weight:600}
+.label b{color:var(--acc);font-weight:700;margin-right:.4rem}
+select{width:100%;padding:.8rem .95rem;border-radius:var(--r);border:1px solid var(--border);background:var(--bg2);color:var(--ink);font-size:.88rem;appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%23e5c15a' d='M0 0l5 6 5-6z'/></svg>");background-repeat:no-repeat;background-position:right .95rem center;background-size:10px;font-family:inherit}
+select:focus{outline:none;border-color:var(--acc)}
+select option{background:var(--bg2);color:var(--ink)}
+.prompt-preview{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:1rem;font-family:var(--fm);font-size:.72rem;line-height:1.6;color:#a8d8b0;max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-word}
+.prompt-preview .pp-label{font-size:.62rem;color:var(--acc);letter-spacing:.15em;text-transform:uppercase;font-weight:700;margin-bottom:.4rem;display:block}
+.video-result{background:#000;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-top:1rem}
+.video-result video{width:100%;display:block;aspect-ratio:16/9;object-fit:contain;background:#000}
+.video-result .vr-meta{padding:.6rem .8rem;background:var(--panel);font-size:.7rem;color:var(--dim);display:flex;justify-content:space-between;flex-wrap:wrap;gap:.4rem}
+.video-placeholder{aspect-ratio:16/9;background:var(--bg2);display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:.75rem;font-family:var(--fm);flex-direction:column;gap:.6rem;border:1px dashed var(--border);border-radius:var(--r);margin-top:1rem}
+.spinner{width:14px;height:14px;border:2px solid rgba(229,193,90,.2);border-top-color:var(--acc);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.status-bar{position:fixed;bottom:0;left:0;right:0;background:var(--bg3);border-top:1px solid var(--border);color:var(--ink);padding:.85rem 1.1rem;font-size:.78rem;display:flex;align-items:center;gap:.7rem;transform:translateY(100%);transition:transform .35s cubic-bezier(.2,.9,.3,1);z-index:100;font-family:var(--fm);box-shadow:0 -4px 20px rgba(0,0,0,.4)}
+.status-bar.visible{transform:translateY(0)}
+.debug-panel{position:fixed;bottom:0;left:0;right:0;height:220px;background:#05050a;border-top:2px solid var(--acc);z-index:200;display:flex;flex-direction:column;font-family:var(--fm);box-shadow:0 -8px 32px rgba(0,0,0,.7);transition:height .3s ease}
+.debug-panel.collapsed{height:36px}
+.debug-header{display:flex;justify-content:space-between;align-items:center;padding:.4rem .7rem;background:linear-gradient(90deg,#0f0f18,#1a1a28);border-bottom:1px solid var(--border);flex-shrink:0;user-select:none}
+.debug-tabs{display:flex;gap:.25rem}
+.debug-tab{background:transparent;border:1px solid var(--border);color:var(--dim);font-size:.65rem;padding:.3rem .65rem;border-radius:3px;cursor:pointer;letter-spacing:.1em;text-transform:uppercase;font-family:inherit}
+.debug-tab.active{color:var(--acc);border-color:var(--acc);background:rgba(229,193,90,.08)}
+.debug-actions{display:flex;gap:.3rem}
+.debug-actions button{background:transparent;border:1px solid var(--border);color:var(--dim);font-size:.6rem;padding:.25rem .5rem;border-radius:2px;cursor:pointer;font-family:inherit}
+.debug-actions button:hover{color:var(--acc);border-color:var(--acc)}
+.debug-body{flex:1;overflow-y:auto;padding:.5rem .7rem 1rem;font-size:.7rem;line-height:1.45;color:#c8c8d0}
+.debug-body.hidden{display:none}
+.debug-entry{margin-bottom:.25rem;padding:.2rem .4rem;border-left:2px solid transparent;border-radius:2px;word-break:break-word}
+.debug-entry.info{border-left-color:var(--faint)}
+.debug-entry.success{border-left-color:var(--ok);background:rgba(74,157,106,.04)}
+.debug-entry.warn{border-left-color:var(--warn);background:rgba(212,160,23,.04)}
+.debug-entry.error{border-left-color:var(--err);background:rgba(200,90,74,.06);color:#f0a0a0}
+.debug-entry.api{border-left-color:var(--acc)}
+.debug-entry.response{border-left-color:var(--acc2)}
+.debug-time{color:var(--faint);margin-right:.5rem;font-size:.62rem}
+.debug-cat{color:var(--acc);font-weight:600;margin-right:.4rem;font-size:.62rem}
+.debug-msg{color:#d8d8e0}
+.debug-data{margin-top:.25rem;padding:.35rem .5rem;background:#0a0a12;border:1px solid var(--border);border-radius:2px;font-size:.65rem;color:#a8d8b0;max-height:140px;overflow:auto;white-space:pre-wrap;word-break:break-all;line-height:1.4}
+.hidden{display:none!important}
+.presets-row{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.4rem}
+.preset-chip{padding:.35rem .7rem;border-radius:14px;border:1px solid var(--border);background:var(--bg2);color:var(--dim);font-size:.7rem;cursor:pointer;transition:all .15s;user-select:none}
+.preset-chip:hover{border-color:var(--acc);color:var(--acc)}
+.preset-chip:active{transform:scale(.96)}
+@media(max-width:480px){h1{font-size:1.5rem}body{padding-bottom:26rem}.debug-panel{height:200px}}
 </style>
 </head>
 <body>
-  <h1>CINÉ-GENESIS</h1>
-  
-  <div id="app">
-    <div class="card">
-      <h3 id="status-title">Aucun projet</h3>
-      <p id="status-desc">Prêt à créer votre premier film.</p>
-    </div>
-    
-    <button id="btn-create" onclick="createProject()">1. Créer un nouveau film</button>
-    <button id="btn-run" onclick="runAllPipeline()" disabled>2. Lancer la génération IA</button>
-    
-    <div id="progress" class="card" style="display:none;">
-      <h4 style="margin-top:0;">Storyboard du film :</h4>
-      <ul id="progress-list"></ul>
-    </div>
 
-    <div class="log" id="console-log">> Système prêt.</div>
-  </div>
+<header>
+<h1>Générateur Vidéo</h1>
+<p class="subtitle">Composez votre prompt structuré · Sujet + Action + Caméra + Éclairage + Style + Audio</p>
+</header>
 
-<script type="module">
-// --- BASE DE DONNÉES (TIROIRS) ---
-const DB_NAME = 'cine-genesis';
-const DB_VERSION = 1;
-let _db = null;
+<div class="banner">
+<strong>Le prompt structuré :</strong> chaque vidéo est générée à partir de <span class="hl">6 couches</span> —
+<span class="hl">Sujet</span> (qui/quoi), <span class="hl">Action</span> (mouvement continu),
+<span class="hl">Caméra</span> (plan + mouvement), <span class="hl">Éclairage</span> (source + ambiance),
+<span class="hl">Style</span> (rendu global) et <span class="hl">Audio</span> (son diegetique).
+Remplissez chaque champ ou utilisez un preset. Le prompt final est assemblé automatiquement.
+</div>
 
-function openDB() {
-  if (_db) return Promise.resolve(_db);
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (e.oldVersion < 1) {
-        db.createObjectStore('sessions', { keyPath: 'id' });
-        db.createObjectStore('characters', { keyPath: 'id' });
-        const sc = db.createObjectStore('scenes', { keyPath: 'id' });
-        sc.createIndex('by_sessionId', 'sessionId');
-        const p = db.createObjectStore('plans', { keyPath: 'id' });
-        p.createIndex('by_sessionId', 'sessionId');
-        db.createObjectStore('logs', { keyPath: 'id', autoIncrement: true });
-      }
-    };
-    req.onsuccess = () => { _db = req.result; resolve(_db); };
-    req.onerror = () => reject(req.error);
-  });
-}
+<div class="panel" id="api-panel">
+<label class="label"><b>01</b> Clés API Agnes — une par ligne</label>
+<textarea id="api-keys-input" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx&#10;sk-yyyyyyyyyyyyyyyyyyyyyyyy" rows="3" spellcheck="false" autocomplete="off"></textarea>
+<button type="button" class="btn" id="api-save-btn">Enregistrer les clés</button>
+<div class="status" id="api-status-line"><span class="dot"></span><span id="api-status-text">Aucune clé API enregistrée</span></div>
+<div class="keys-list" id="api-keys-status"></div>
+<div class="hint">Clés gratuites sur <a href="https://platform.agnes-ai.com" target="_blank">platform.agnes-ai.com</a> · N clés = N générations en parallèle</div>
+</div>
 
-const _reqP = (r) => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
-const db = {
-  get: (store, key) => openDB().then(d => _reqP(d.transaction(store).objectStore(store).get(key))),
-  put: (store, val) => openDB().then(d => _reqP(d.transaction(store, 'readwrite').objectStore(store).put(val))),
-  getAll: (store) => openDB().then(d => _reqP(d.transaction(store).objectStore(store).getAll())),
-  byIndex: (store, idx, key) => openDB().then(d => _reqP(d.transaction(store).objectStore(store).index(idx).getAll(key))),
+<div class="section open" id="sec-subject">
+<div class="section-header" data-toggle="sec-subject"><span class="section-title">🎯 Sujet <span class="badge">qui / quoi</span></span><span class="chevron">▼</span></div>
+<div class="section-body"><div class="section-content">
+<textarea id="subject-input" placeholder="Ex : Une jeune barista aux cheveux courts et foncés, portant un tablier vert en jean, derrière un comptoir en marbre."></textarea>
+<div class="presets-row" id="presets-subject"></div>
+</div></div>
+</div>
+
+<div class="section open" id="sec-action">
+<div class="section-header" data-toggle="sec-action"><span class="section-title">🏃 Action <span class="badge">mouvement continu</span></span><span class="chevron">▼</span></div>
+<div class="section-body"><div class="section-content">
+<textarea id="action-input" placeholder="Ex : Elle fait mousser du lait, puis se tourne lentement vers la caméra avec un sourire discret."></textarea>
+<div class="presets-row" id="presets-action"></div>
+</div></div>
+</div>
+
+<div class="section open" id="sec-camera">
+<div class="section-header" data-toggle="sec-camera"><span class="section-title">🎥 Caméra <span class="badge">plan + mouvement</span></span><span class="chevron">▼</span></div>
+<div class="section-body"><div class="section-content">
+<div class="row">
+<label class="label">Taille de plan</label>
+<select id="shot-size-select">
+<option value="wide shot">Plan large (WS)</option>
+<option value="medium shot" selected>Plan moyen (MS)</option>
+<option value="medium close-up">Plan moyen rapproché (MCU)</option>
+<option value="close-up">Gros plan (CU)</option>
+<option value="extreme close-up">Très gros plan (ECU)</option>
+<option value="extreme wide shot">Très large / establishing (EWS)</option>
+</select>
+</div>
+<div class="row">
+<label class="label">Mouvement de caméra</label>
+<select id="camera-move-select">
+<option value="locked-off static" selected>Statique verrouillé</option>
+<option value="slow dolly in">Travelling avant lent</option>
+<option value="slow dolly out">Travelling arrière lent</option>
+<option value="smooth tracking shot">Tracking fluide</option>
+<option value="slow orbit">Orbite lente</option>
+<option value="crane up">Grue montante</option>
+<option value="crane down">Grue descendante</option>
+<option value="whip pan">Whip pan</option>
+<option value="tilt up">Inclinaison haut</option>
+<option value="tilt down">Inclinaison bas</option>
+<option value="handheld">Caméra à l'épaule</option>
+</select>
+</div>
+<div class="row">
+<label class="label">Angle</label>
+<select id="angle-select">
+<option value="eye-level" selected>Hauteur d'œil</option>
+<option value="low angle">Contre-plongée</option>
+<option value="high angle">Plongée</option>
+<option value="bird's eye">Vue du dessus</option>
+<option value="dutch angle">Angle hollandais</option>
+<option value="over-the-shoulder">Par-dessus l'épaule</option>
+</select>
+</div>
+<div class="row">
+<label class="label">Objectif / Profondeur</label>
+<select id="lens-select">
+<option value="35mm shallow depth of field" selected>35mm · faible profondeur</option>
+<option value="50mm deep focus">50mm · grande profondeur</option>
+<option value="85mm shallow depth of field">85mm · bokeh prononcé</option>
+<option value="anamorphic lens flare">Anamorphique · flare</option>
+<option value="wide-angle">Grand-angle</option>
+</select>
+</div>
+</div></div>
+</div>
+
+<div class="section open" id="sec-light">
+<div class="section-header" data-toggle="sec-light"><span class="section-title">💡 Éclairage <span class="badge">source + ambiance</span></span><span class="chevron">▼</span></div>
+<div class="section-body"><div class="section-content">
+<div class="row">
+<label class="label">Type d'éclairage</label>
+<select id="lighting-select">
+<option value="warm morning window light, soft shadows" selected>Lumière matinale chaude par fenêtre</option>
+<option value="golden hour backlight with rim light">Contre-jour heure dorée + rim light</option>
+<option value="overcast soft daylight">Lumière douce couverte</option>
+<option value="harsh midday sun">Soleil dur de midi</option>
+<option value="neon ambient from left">Néon d'ambiance venant de gauche</option>
+<option value="studio high-key clean lighting">Studio high-key épuré</option>
+<option value="low-key dramatic side light">Low-key dramatique latéral</option>
+<option value="blue hour ambient">Heure bleue ambiante</option>
+<option value="candlelight flicker">Lumière de bougie vacillante</option>
+<option value="moonlight cool ambient">Clair de lune froid</option>
+</select>
+</div>
+<div class="row">
+<label class="label">Ambiance / Ton</label>
+<select id="mood-select">
+<option value="intimate and warm" selected>Intime et chaleureux</option>
+<option value="cinematic and dramatic">Cinématographique et dramatique</option>
+<option value="dreamy and ethereal">Onirique et éthéré</option>
+<option value="tense and suspenseful">Tendu et suspense</option>
+<option value="joyful and energetic">Joyeux et énergique</option>
+<option value="melancholic and quiet">Mélancolique et calme</option>
+<option value="epic and grand">Épique et grandiose</option>
+<option value="mysterious and eerie">Mystérieux et étrange</option>
+</select>
+</div>
+</div></div>
+</div>
+
+<div class="section open" id="sec-style">
+<div class="section-header" data-toggle="sec-style"><span class="section-title">🎨 Style <span class="badge">rendu global</span></span><span class="chevron">▼</span></div>
+<div class="section-body"><div class="section-content">
+<div class="row">
+<label class="label">Rendu visuel</label>
+<select id="style-select">
+<option value="cinematic, 35mm film grain, shallow depth of field, color graded" selected>Cinématographique · 35mm</option>
+<option value="clean commercial product render, 4K, sharp details">Produit commercial · 4K net</option>
+<option value="warm lifestyle aesthetic, soft contrast">Lifestyle chaleureux</option>
+<option value="film noir, high contrast black and white, grain">Film noir N&B</option>
+<option value="anime cel-shaded, vibrant colors">Anime cel-shading</option>
+<option value="documentary handheld, natural light, realistic">Documentaire réaliste</option>
+<option value="retro VHS, chromatic aberration, analog">Rétro VHS analogique</option>
+<option value="pastel Wes Anderson, symmetrical, deadpan">Wes Anderson pastel</option>
+<option value="cyberpunk neon, rain-slick, futuristic">Cyberpunk néon</option>
+<option value="watercolor painting, soft bleeding edges">Aquarelle peinte</option>
+</select>
+</div>
+<div class="row">
+<label class="label">Ratio</label>
+<select id="ratio-select">
+<option value="16:9" selected>16:9 — Paysage</option>
+<option value="9:16">9:16 — Portrait</option>
+<option value="1:1">1:1 — Carré</option>
+</select>
+</div>
+<div class="row">
+<label class="label">Durée</label>
+<select id="duration-select">
+<option value="121">5 secondes</option>
+<option value="145" selected>6 secondes</option>
+<option value="169">7 secondes</option>
+<option value="241">10 secondes</option>
+</select>
+</div>
+</div></div>
+</div>
+
+<div class="section" id="sec-audio">
+<div class="section-header" data-toggle="sec-audio"><span class="section-title">🔊 Audio <span class="badge">optionnel</span></span><span class="chevron">▼</span></div>
+<div class="section-body"><div class="section-content">
+<textarea id="audio-input" placeholder="Ex : Bruit ambiant de café, sifflement de la buse vapeur, tintement discret d'une cuillère. Aucune musique." rows="2"></textarea>
+<div class="presets-row" id="presets-audio"></div>
+</div></div>
+</div>
+
+<div class="section open" id="sec-prompt">
+<div class="section-header" data-toggle="sec-prompt"><span class="section-title">📝 Prompt final assemblé <span class="badge" id="prompt-badge">—</span></span><span class="chevron">▼</span></div>
+<div class="section-body"><div class="section-content">
+<div class="prompt-preview" id="prompt-preview">
+<span class="pp-label">Prompt complet</span>
+Le prompt assemblé apparaîtra ici au fur et à mesure de votre saisie…
+</div>
+<button type="button" class="btn" id="copy-prompt-btn" style="margin-top:.6rem;">📋 Copier le prompt</button>
+</div></div>
+</div>
+
+<button type="button" class="btn btn-primary" id="generate-btn" disabled>
+▶ Générer la vidéo
+<span style="display:block;font-size:.65rem;letter-spacing:.15em;color:var(--dim);margin-top:.4rem;font-weight:400;text-transform:none;">Le prompt structuré est envoyé à Agnes Video</span>
+</button>
+<button type="button" class="btn btn-stop" id="stop-btn">⏹ Arrêter</button>
+
+<div class="section hidden" id="sec-result">
+<div class="section-header" data-toggle="sec-result"><span class="section-title">🎬 Vidéo générée</span><span class="chevron">▼</span></div>
+<div class="section-body"><div class="section-content">
+<div class="video-placeholder" id="video-placeholder"><div class="spinner"></div><span>Génération en cours…</span></div>
+<div class="video-result hidden" id="video-result">
+<video id="result-video" controls playsinline preload="metadata"></video>
+<div class="vr-meta">
+<span id="result-meta">—</span>
+<a href="#" id="download-video-link" target="_blank" rel="noopener" style="color:var(--acc);text-decoration:none;">⬇ Ouvrir / Télécharger</a>
+</div>
+</div>
+</div></div>
+</div>
+
+<div class="status-bar" id="status-bar"><div class="spinner"></div><span id="status-text">Préparation…</span></div>
+<div class="toast" id="toast"><span id="toast-icon">✓</span><span id="toast-text">Message</span></div>
+
+<div class="debug-panel" id="debug-panel">
+<div class="debug-header" id="debug-header">
+<div class="debug-tabs">
+<button type="button" class="debug-tab active" data-tab="journal" id="tab-journal">📻 Journal</button>
+<button type="button" class="debug-tab" data-tab="tech" id="tab-tech">🖥️ Technique</button>
+</div>
+<div class="debug-actions">
+<button type="button" id="debug-copy-btn">Copier</button>
+<button type="button" id="debug-clear-btn">Effacer</button>
+<button type="button" id="debug-collapse-btn">−</button>
+</div>
+</div>
+<div class="debug-body" id="journal-body"></div>
+<div class="debug-body hidden" id="tech-body"></div>
+</div>
+
+<canvas id="noSleepCanvas" width="2" height="2"></canvas>
+<video id="noSleepVideo" playsinline muted loop></video>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// CONFIGURATION
+// ══════════════════════════════════════════════════════════════════
+const API_BASE = 'https://apihub.agnes-ai.com/v1';
+const POLL_BASE = 'https://apihub.agnes-ai.com/agnesapi';
+const MODEL_TEXT = 'agnes-2.5-flash';
+const MODEL_IMAGE = 'agnes-image-2.1-flash';
+const MODEL_VIDEO = 'agnes-video-v2.0';
+const FRAME_RATE = 24;
+
+const VIDEO_FIRST_POLL_DELAY_SEC = 60;
+const VIDEO_POLL_INTERVALS = [8, 8, 12, 12, 20, 20, 25];
+const VIDEO_MAX_POLL_ATTEMPTS = 100;
+
+const API_KEYS_STORAGE = 'video_prompt_studio_keys_v1';
+const DEBUG_MAX = 600;
+
+// ══════════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════════
+const state = {
+  keyPool: [],
+  isRunning: false,
+  stopRequested: false,
+  videos: [],
+  workingPollUrlBuilder: null
 };
 
-// --- OUTILS ET LOGIQUE ---
-const STATUS = { PENDING: 'pending', RUNNING: 'running', DONE: 'done' };
-const consoleLog = (msg) => {
-  const el = document.getElementById('console-log');
-  el.innerHTML += `<br>> ${msg}`;
-  el.scrollTop = el.scrollHeight;
-};
+// ══════════════════════════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════════════════════════
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+function setStatus(text){const b=document.getElementById('status-bar');const t=document.getElementById('status-text');if(!b||!t)return;if(text){b.classList.add('visible');t.textContent=text}else b.classList.remove('visible')}
 
-async function recomputeStage(sessionId) {
-  const allChars = await db.getAll('characters');
-  const chars = allChars.filter(c => c.sessionId === sessionId);
-  if (chars.length === 0 || chars.some(c => c.status !== STATUS.DONE)) return 'characters';
-  
-  const scenes = await db.byIndex('scenes', 'by_sessionId', sessionId);
-  if (scenes.length === 0 || scenes.some(s => s.status !== STATUS.DONE)) return 'scenes';
-  
-  const plans = await db.byIndex('plans', 'by_sessionId', sessionId);
-  if (plans.length === 0 || plans.some(p => p.status !== STATUS.DONE)) return 'plans';
-  
-  return 'done';
+let toastTimeout=null;
+function showToast(message,type='success',duration=2800){const t=document.getElementById('toast');const i=document.getElementById('toast-icon');const x=document.getElementById('toast-text');if(!t||!i||!x)return;t.classList.remove('visible','success','error','warn');void t.offsetWidth;const icons={success:'✓',error:'✕',warn:'⚠'};i.textContent=icons[type]||'✓';x.textContent=message;t.classList.add(type);requestAnimationFrame(()=>t.classList.add('visible'));if(toastTimeout)clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>t.classList.remove('visible'),duration)}
+
+function nowTime(){return new Date().toLocaleTimeString('fr-FR',{hour12:false})}
+
+// ══════════════════════════════════════════════════════════════════
+// JOURNAL
+// ══════════════════════════════════════════════════════════════════
+function journalLog(msg, level){
+  level = level || 'info';
+  const body = document.getElementById('journal-body');
+  if(!body) return;
+  const icons = { info:'·', highlight:'▶', success:'✅', warn:'⚠️', error:'❌', video:'🎥', key:'🔑' };
+  const icon = icons[level] || '·';
+  const entry = document.createElement('div');
+  entry.className = 'j-entry ' + level;
+  entry.innerHTML = '<span class="j-time">'+esc(nowTime())+'</span><span class="j-icon">'+icon+'</span><span class="j-msg">'+esc(msg)+'</span>';
+  entry.style.cssText = 'display:flex;gap:.6rem;padding:.25rem 0;border-bottom:1px dashed rgba(255,255,255,.04);align-items:flex-start';
+  entry.querySelector('.j-time').style.cssText = 'font-family:var(--fm);font-size:.7rem;color:var(--faint);flex-shrink:0;min-width:64px;padding-top:.15rem';
+  entry.querySelector('.j-msg').style.cssText = 'color:#d8d8e0;flex:1;word-break:break-word;font-size:.78rem';
+  body.appendChild(entry);
+  body.scrollTop = body.scrollHeight;
+  while(body.children.length > DEBUG_MAX) body.removeChild(body.firstChild);
 }
 
-function renderItem(type, name, status, text, imageUrl) {
-  let html = `<li>`;
-  html += `<div class="item-title">${type}: ${name} ${status === 'done' ? '✅' : '⏳'}</div>`;
-  if (text) html += `<div class="item-text">"${text}"</div>`;
-  if (imageUrl) html += `<img src="${imageUrl}" class="item-image" loading="lazy" alt="${name}">`;
-  html += `</li>`;
-  return html;
-}
-
-async function updateUI(sessionId) {
-  const stage = await recomputeStage(sessionId);
-  document.getElementById('status-desc').innerText = `Étape actuelle : ${stage.toUpperCase()}`;
-  
-  const list = document.getElementById('progress-list');
-  list.innerHTML = '';
-  
-  const allChars = await db.getAll('characters');
-  const chars = allChars.filter(c => c.sessionId === sessionId);
-  chars.forEach(c => list.innerHTML += renderItem('Personnage', c.name, c.status, c.text, c.image));
-  
-  const scenes = await db.byIndex('scenes', 'by_sessionId', sessionId);
-  scenes.forEach(s => list.innerHTML += renderItem('Scène', s.title, s.status, s.text, s.image));
-  
-  const plans = await db.byIndex('plans', 'by_sessionId', sessionId);
-  plans.forEach(p => list.innerHTML += renderItem('Plan', p.shotType, p.status, p.text, p.image));
-}
-
-// --- APPELS API (100% POLLINATIONS, SANS CLÉ API) ---
-async function apiGenerateText(prompt) {
-  consoleLog(`[Pollinations] Écriture...`);
-  try {
-    const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(prompt)}`);
-    if (!res.ok) throw new Error("Erreur serveur texte");
-    return await res.text();
-  } catch(e) {
-    throw new Error("Impossible de générer le texte.");
-  }
-}
-
-async function apiGenerateImage(prompt) {
-  consoleLog(`[Pollinations] Dessin (pause anti-blocage)...`);
-  await new Promise(r => setTimeout(r, 45000)); // Pause de 7 secondes
-  const seed = Math.floor(Math.random() * 1000000);
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=450&nologo=true&seed=${seed}`;
-}
-
-// --- LOGIQUE DE L'APPLICATION ---
-let currentSessionId = null;
-
-window.createProject = async () => {
-  document.getElementById('btn-create').disabled = true;
-  document.getElementById('btn-run').disabled = false;
-  document.getElementById('progress').style.display = 'block';
-  
-  currentSessionId = crypto.randomUUID();
-  consoleLog("Nouvelle session : " + currentSessionId);
-  
-  await db.put('sessions', { id: currentSessionId, title: "Mon Film", genre: "cyberpunk", createdAt: Date.now() });
-  
-  await db.put('characters', { id: crypto.randomUUID(), sessionId: currentSessionId, name: "Néo", status: STATUS.PENDING });
-  await db.put('characters', { id: crypto.randomUUID(), sessionId: currentSessionId, name: "Trinity", status: STATUS.PENDING });
-  
-  await db.put('scenes', { id: crypto.randomUUID(), sessionId: currentSessionId, title: "La pluie", status: STATUS.PENDING });
-  await db.put('scenes', { id: crypto.randomUUID(), sessionId: currentSessionId, title: "Le combat", status: STATUS.PENDING });
-  
-  const sceneId = (await db.byIndex('scenes', 'by_sessionId', currentSessionId))[0].id;
-  await db.put('plans', { id: crypto.randomUUID(), sessionId: currentSessionId, sceneId: sceneId, shotType: "Plan large", status: STATUS.PENDING });
-  
-  document.getElementById('status-title').innerText = "Projet créé !";
-  await updateUI(currentSessionId);
-};
-
-window.runAllPipeline = async () => {
-  document.getElementById('btn-run').disabled = true;
-  consoleLog("--- Démarrage de la génération ---");
-  
-  try {
-    const allChars = await db.getAll('characters');
-    const chars = allChars.filter(c => c.sessionId === currentSessionId);
-    for (let c of chars) {
-      if (c.status === STATUS.PENDING) {
-        c.status = STATUS.RUNNING; await db.put('characters', c); await updateUI(currentSessionId);
-        try {
-          c.text = await apiGenerateText("Décris le personnage de film cyberpunk " + c.name + " en 2 phrases.");
-          c.image = await apiGenerateImage("Portrait cinématographique de " + c.name + ", style cyberpunk, néons");
-          c.status = STATUS.DONE; 
-        } catch(e) {
-          consoleLog(`Erreur sur ${c.name}: ${e.message}`);
-          c.status = STATUS.DONE;
-        }
-        await db.put('characters', c); await updateUI(currentSessionId);
-      }
-    }
-    
-    const scenes = await db.byIndex('scenes', 'by_sessionId', currentSessionId);
-    for (let s of scenes) {
-      if (s.status === STATUS.PENDING) {
-        s.status = STATUS.RUNNING; await db.put('scenes', s); await updateUI(currentSessionId);
-        try {
-          s.text = await apiGenerateText("Décris le décor de cette scène cyberpunk : " + s.title);
-          s.image = await apiGenerateImage("Décor de cinéma cyberpunk : " + s.title + ", sombre, pluie");
-          s.status = STATUS.DONE;
-        } catch(e) {
-          consoleLog(`Erreur sur ${s.title}: ${e.message}`);
-          s.status = STATUS.DONE;
-        }
-        await db.put('scenes', s); await updateUI(currentSessionId);
-      }
-    }
-    
-    const plans = await db.byIndex('plans', 'by_sessionId', currentSessionId);
-    for (let p of plans) {
-      if (p.status === STATUS.PENDING) {
-        p.status = STATUS.RUNNING; await db.put('plans', p); await updateUI(currentSessionId);
-        try {
-          p.image = await apiGenerateImage("Image de film cyberpunk. Type de plan : " + p.shotType);
-          p.status = STATUS.DONE;
-        } catch(e) {
-          consoleLog(`Erreur sur le plan: ${e.message}`);
-          p.status = STATUS.DONE;
-        }
-        await db.put('plans', p); await updateUI(currentSessionId);
-      }
-    }
-
-    consoleLog("--- 🎬 GÉNÉRATION TERMINÉE ! ---");
-  } catch (err) {
-    consoleLog("❌ ERREUR GLOBALE : " + err.message);
-  }
-  
-  document.getElementById('btn-run').disabled = false;
-  await updateUI(currentSessionId);
-};
-</script>
-</body>
-</html>.
+// ══════════════════════════════════════════════════════════════════
+// DEBUG
+// ══════════════════════════════════════════════════════════════════
+let debugCount=0,debugEntries=[],debugCollapsed=false,currentTab='journal';
+function debugLog(level,category,message,data){const body=document.getElementById('tech-body');if(!body)return;const time=nowTime();const entry=document.createElement('div');entry.className='debug-entry '+level;let html='<span class="debug-time">'+time+'</span><span class="debug-cat">['+esc(category)+']</span><span class="debug-msg">'+esc(message)+'</span>';if(data!==undefined&&data!==null){let ds;if(typeof data==='string')ds=data;else{try{ds=JSON.stringify(data,null,2)}catch(e){ds=String(data)}}if(ds.length>3000)ds=ds.slice(0,3000)+'\n…[tronqué]';html+='<pre class="debug-data">'+esc(ds)+'</pre>'}entry.innerHTML=html;body.appendChild(entry);debugEntries.push({time,level,category,message
