@@ -10,18 +10,26 @@
   button { background: #ff0055; color: white; border: none; padding: 12px; border-radius: 8px; font-size: 16px; margin: 5px 0; width: 100%; font-weight: bold; }
   button:disabled { background: #555; }
   .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #ff0055; }
-  .log { font-size: 12px; color: #aaa; font-family: monospace; max-height: 150px; overflow-y: auto; margin-top: 20px; background: #000; padding: 10px; }
+  .log { font-size: 12px; color: #aaa; font-family: monospace; max-height: 200px; overflow-y: auto; margin-top: 20px; background: #000; padding: 10px; }
+  input { width: 90%; padding: 10px; border-radius: 5px; border: none; background: #333; color: white; margin-top: 5px; font-size: 16px; }
 </style>
 </head>
 <body>
   <h1>CINÉ-GENESIS</h1>
+  
+  <div class="card">
+    <h4 style="margin-top:0;">Clé API Google Gemini</h4>
+    <input type="password" id="api-key" placeholder="Colle ta clé AIza... ici" onchange="saveApiKey()">
+    <p style="font-size:12px; color:#aaa;">Ta clé est sauvegardée uniquement sur ton téléphone.</p>
+  </div>
+
   <div id="app">
     <div class="card">
       <h3 id="status-title">Aucun projet</h3>
       <p id="status-desc">Prêt à créer votre premier film.</p>
     </div>
     
-    <button id="btn-create" onclick="createProject()">1. Créer un nouveau film (Simulation)</button>
+    <button id="btn-create" onclick="createProject()">1. Créer un nouveau film</button>
     <button id="btn-run" onclick="runAllPipeline()" disabled>2. Lancer la génération IA</button>
     
     <div id="progress" class="card" style="display:none;">
@@ -33,6 +41,13 @@
   </div>
 
 <script type="module">
+window.saveApiKey = () => {
+  const key = document.getElementById('api-key').value;
+  localStorage.setItem('gemini_api_key', key);
+  consoleLog("Clé API enregistrée !");
+};
+document.getElementById('api-key').value = localStorage.getItem('gemini_api_key') || '';
+
 const DB_NAME = 'cine-genesis';
 const DB_VERSION = 1;
 let _db = null;
@@ -96,27 +111,59 @@ async function updateUI(sessionId) {
   
   const allChars = await db.getAll('characters');
   const chars = allChars.filter(c => c.sessionId === sessionId);
-  chars.forEach(c => list.innerHTML += `<li>Perso: ${c.name} - ${c.status}</li>`);
+  chars.forEach(c => list.innerHTML += `<li>Perso: ${c.name} - ${c.status} ${c.image ? '🖼️' : ''}</li>`);
   
   const scenes = await db.byIndex('scenes', 'by_sessionId', sessionId);
-  scenes.forEach(s => list.innerHTML += `<li>Scène: ${s.title} - ${s.status}</li>`);
+  scenes.forEach(s => list.innerHTML += `<li>Scène: ${s.title} - ${s.status} ${s.image ? '🖼️' : ''}</li>`);
   
   const plans = await db.byIndex('plans', 'by_sessionId', sessionId);
-  plans.forEach(p => list.innerHTML += `<li>Plan: ${p.shotType} - ${p.status}</li>`);
+  plans.forEach(p => list.innerHTML += `<li>Plan: ${p.shotType} - ${p.status} ${p.image ? '🖼️' : ''}</li>`);
 }
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 async function apiGenerateText(prompt) {
-  consoleLog(`API Texte : "${prompt.substring(0,20)}..."`);
-  await sleep(1000);
-  return "Texte généré.";
+  const key = localStorage.getItem('gemini_api_key');
+  if (!key) throw new Error("Clé API manquante");
+  
+  consoleLog(`[Gemini] Écriture : "${prompt.substring(0,20)}..."`);
+  
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+  });
+  
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.candidates[0].content.parts[0].text;
 }
 
 async function apiGenerateImage(prompt) {
-  consoleLog(`API Image : "${prompt.substring(0,20)}..."`);
-  await sleep(1500);
-  return "image_simulee";
+  const key = localStorage.getItem('gemini_api_key');
+  if (!key) throw new Error("Clé API manquante");
+  
+  consoleLog(`[Gemini] Dessin : "${prompt.substring(0,20)}..."`);
+  
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${key}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseModalities: ["TEXT", "IMAGE"] }
+    })
+  });
+  
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  
+  const parts = data.candidates[0].content.parts;
+  const imagePart = parts.find(p => p.inlineData);
+  
+  if (imagePart) {
+    return "data:image/jpeg;base64," + imagePart.inlineData.data;
+  }
+  throw new Error("Pas d'image générée");
 }
 
 let currentSessionId = null;
@@ -145,39 +192,51 @@ window.createProject = async () => {
 };
 
 window.runAllPipeline = async () => {
-  document.getElementById('btn-run').disabled = true;
-  consoleLog("--- Démarrage de la génération ---");
-  
-  const allChars = await db.getAll('characters');
-  const chars = allChars.filter(c => c.sessionId === currentSessionId);
-  for (let c of chars) {
-    if (c.status === STATUS.PENDING) {
-      c.status = STATUS.RUNNING; await db.put('characters', c); await updateUI(currentSessionId);
-      c.text = await apiGenerateText("Fiche perso de " + c.name);
-      c.image = await apiGenerateImage("Portrait de " + c.name);
-      c.status = STATUS.DONE; await db.put('characters', c); await updateUI(currentSessionId);
-    }
-  }
-  
-  const scenes = await db.byIndex('scenes', 'by_sessionId', currentSessionId);
-  for (let s of scenes) {
-    if (s.status === STATUS.PENDING) {
-      s.status = STATUS.RUNNING; await db.put('scenes', s); await updateUI(currentSessionId);
-      s.image = await apiGenerateImage("Décor : " + s.title);
-      s.status = STATUS.DONE; await db.put('scenes', s); await updateUI(currentSessionId);
-    }
-  }
-  
-  const plans = await db.byIndex('plans', 'by_sessionId', currentSessionId);
-  for (let p of plans) {
-    if (p.status === STATUS.PENDING) {
-      p.status = STATUS.RUNNING; await db.put('plans', p); await updateUI(currentSessionId);
-      p.image = await apiGenerateImage("Plan : " + p.shotType);
-      p.status = STATUS.DONE; await db.put('plans', p); await updateUI(currentSessionId);
-    }
+  const key = localStorage.getItem('gemini_api_key');
+  if (!key) {
+    alert("N'oublie pas de coller ta clé API Google en haut de la page !");
+    return;
   }
 
-  consoleLog("--- Génération terminée ! ---");
+  document.getElementById('btn-run').disabled = true;
+  consoleLog("--- Démarrage de la VRAIE génération IA ---");
+  
+  try {
+    const allChars = await db.getAll('characters');
+    const chars = allChars.filter(c => c.sessionId === currentSessionId);
+    for (let c of chars) {
+      if (c.status === STATUS.PENDING) {
+        c.status = STATUS.RUNNING; await db.put('characters', c); await updateUI(currentSessionId);
+        c.text = await apiGenerateText("Décris le personnage de film cyberpunk " + c.name + " en 2 phrases.");
+        c.image = await apiGenerateImage("Portrait cinématographique de " + c.name + ", style cyberpunk, néons, haute qualité");
+        c.status = STATUS.DONE; await db.put('characters', c); await updateUI(currentSessionId);
+      }
+    }
+    
+    const scenes = await db.byIndex('scenes', 'by_sessionId', currentSessionId);
+    for (let s of scenes) {
+      if (s.status === STATUS.PENDING) {
+        s.status = STATUS.RUNNING; await db.put('scenes', s); await updateUI(currentSessionId);
+        s.image = await apiGenerateImage("Décor de cinéma cyberpunk : " + s.title + ", sombre, pluie, lumières rouges");
+        s.status = STATUS.DONE; await db.put('scenes', s); await updateUI(currentSessionId);
+      }
+    }
+    
+    const plans = await db.byIndex('plans', 'by_sessionId', currentSessionId);
+    for (let p of plans) {
+      if (p.status === STATUS.PENDING) {
+        p.status = STATUS.RUNNING; await db.put('plans', p); await updateUI(currentSessionId);
+        p.image = await apiGenerateImage("Image de film cyberpunk. Type de plan : " + p.shotType);
+        p.status = STATUS.DONE; await db.put('plans', p); await updateUI(currentSessionId);
+      }
+    }
+
+    consoleLog("--- 🎬 GÉNÉRATION TERMINÉE AVEC SUCCÈS ! ---");
+  } catch (err) {
+    consoleLog("❌ ERREUR : " + err.message);
+    alert("Erreur API : " + err.message);
+  }
+  
   document.getElementById('btn-run').disabled = false;
   await updateUI(currentSessionId);
 };
