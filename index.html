@@ -209,3 +209,233 @@ Le prompt assemblé apparaîtra ici au fur et à mesure de votre saisie…</div>
 <div class="debug-body" id="journal-body"></div>
 <div class="debug-body hidden" id="tech-body"></div>
 </div>
+<script>
+const API_KEYS_STORAGE = 'video_prompt_studio_keys_v1';
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function showToast(message,type='success'){const t=document.getElementById('toast');t.className='toast '+type+' visible';document.getElementById('toast-text').textContent=message;setTimeout(()=>t.classList.remove('visible'),3000)}
+
+function journalLog(msg, level = 'info') {
+    const body = document.getElementById('journal-body');
+    if(!body) return;
+    const entry = document.createElement('div');
+    entry.style.cssText = 'font-size:.75rem; padding:.3rem 0; border-bottom:1px dashed rgba(255,255,255,.1); color:' + (level === 'error' ? '#c85a4a' : (level === 'success' ? '#4a9d6a' : '#d8d8e0'));
+    entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    body.appendChild(entry);
+    body.scrollTop = body.scrollHeight;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    journalLog("Application initialisée");
+    document.querySelectorAll('.section-header').forEach(h => {
+        h.addEventListener('click', () => h.parentElement.classList.toggle('open'));
+    });
+    document.querySelectorAll('textarea, select').forEach(i => {
+        i.addEventListener('input', updatePrompt);
+        i.addEventListener('change', updatePrompt);
+    });
+    try {
+        const saved = localStorage.getItem(API_KEYS_STORAGE);
+        if(saved) {
+            document.getElementById('api-keys-input').value = saved;
+            updateKeyStatus(saved);
+            journalLog("Clés chargées depuis la mémoire locale", "success");
+        }
+    } catch(e) { journalLog("Erreur lecture mémoire: " + e.message, "error"); }
+    
+    document.getElementById('api-save-btn').addEventListener('click', () => {
+        journalLog("Bouton Enregistrer cliqué...");
+        try {
+            const keys = document.getElementById('api-keys-input').value;
+            localStorage.setItem(API_KEYS_STORAGE, keys);
+            showToast('Clés API enregistrées localement.', 'success');
+            updateKeyStatus(keys);
+            journalLog("Clés sauvegardées avec succès !", "success");
+        } catch(e) {
+            showToast('Erreur de sauvegarde : ' + e.message, 'error');
+            journalLog("Erreur sauvegarde: " + e.message, "error");
+        }
+    });
+    document.getElementById('copy-prompt-btn').addEventListener('click', () => {
+        const text = document.getElementById('prompt-preview').innerText.replace('Prompt complet\n', '').trim();
+        navigator.clipboard.writeText(text);
+        showToast('Prompt copié !');
+        journalLog("Prompt copié dans le presse-papier");
+    });
+    document.getElementById('generate-btn').addEventListener('click', generateVideo);
+    updatePrompt();
+});
+
+function updatePrompt() {
+    const subject = document.getElementById('subject-input').value.trim();
+    const action = document.getElementById('action-input').value.trim();
+    const shot = document.getElementById('shot-size-select').value;
+    const move = document.getElementById('camera-move-select').value;
+    const angle = document.getElementById('angle-select').value;
+    const lens = document.getElementById('lens-select').value;
+    const light = document.getElementById('lighting-select').value;
+    const mood = document.getElementById('mood-select').value;
+    const style = document.getElementById('style-select').value;
+    const ratio = document.getElementById('ratio-select').value;
+    const audio = document.getElementById('audio-input').value.trim();
+    
+    let p = [];
+    if(subject) p.push(subject);
+    if(action) p.push(action);
+    p.push(`Camera: ${shot}, ${move}, ${angle}, ${lens}`);
+    p.push(`Lighting: ${light}, ${mood}`);
+    p.push(`Style: ${style}, ratio ${ratio}`);
+    if(audio) p.push(`Audio: ${audio}`);
+    
+    const final = p.join('. ') + '.';
+    document.getElementById('prompt-preview').innerHTML = '<span class="pp-label">Prompt complet</span>\n' + esc(final);
+    
+    const hasKeys = document.getElementById('api-keys-input').value.trim().length > 0;
+    document.getElementById('generate-btn').disabled = !(subject || action) || !hasKeys;
+}
+
+function updateKeyStatus(keysStr) {
+    const keys = keysStr.split('\n').map(k => k.trim()).filter(k => k);
+    const list = document.getElementById('api-keys-status');
+    const statusLine = document.getElementById('api-status-line');
+    list.innerHTML = '';
+    
+    if (keys.length > 0) {
+        document.getElementById('api-status-text').textContent = `${keys.length} clé(s) prête(s)`;
+        statusLine.classList.add('ok');
+    } else {
+        document.getElementById('api-status-text').textContent = 'Aucune clé API enregistrée';
+        statusLine.classList.remove('ok');
+    }
+
+    keys.forEach((k, i) => {
+        const d = document.createElement('div');
+        d.className = 'key-row';
+        const masquer = k.substring(0, 6) + '...' + k.substring(k.length - 4);
+        d.innerHTML = `<span class="key-id">Clé ${i+1} : ${masquer}</span><span class="key-state">Prête</span>`;
+        list.appendChild(d);
+    });
+}
+
+async function generateVideo() {
+    const prompt = document.getElementById('prompt-preview').innerText.replace('Prompt complet\n', '').trim();
+    const ratio = document.getElementById('ratio-select').value;
+    const duration = document.getElementById('duration-select').value;
+    
+    const keys = document.getElementById('api-keys-input').value.split('\n').map(k => k.trim()).filter(k => k);
+    if (keys.length === 0) {
+        showToast("Erreur : Aucune clé API", "error");
+        return;
+    }
+    const apiKey = keys[0];
+
+    document.getElementById('generate-btn').style.display = 'none';
+    document.getElementById('stop-btn').classList.add('visible');
+    document.getElementById('sec-result').classList.remove('hidden');
+    document.getElementById('sec-result').classList.add('open');
+    document.getElementById('video-placeholder').style.display = 'flex';
+    document.getElementById('video-result').classList.add('hidden');
+    document.getElementById('status-bar').classList.add('visible');
+    document.getElementById('status-text').textContent = 'Envoi de la requête à Agnes AI...';
+    journalLog("Envoi de la requête à Agnes AI...");
+
+    try {
+        const response = await fetch('https://apihub.agnes-ai.com/v1/videos', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + apiKey
+            },
+            body: JSON.stringify({
+                model: "agnes-video-2.5",
+                prompt: prompt,
+                duration: parseInt(duration),
+                ratio: ratio
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(()=> ({}));
+            throw new Error(`Erreur ${response.status}: ${errorData.message || 'Problème avec l\'API'}`);
+        }
+
+        const data = await response.json();
+        const videoId = data.id || data.video_id;
+        
+        if (!videoId) throw new Error("L'API n'a pas renvoyé d'ID de vidéo.");
+        
+        journalLog("Tâche créée ! ID: " + videoId, "success");
+        document.getElementById('status-text').textContent = 'Génération en cours (peut prendre 1-2 min)...';
+        
+        let attempts = 0;
+        const maxAttempts = 60;
+        
+        const checkInterval = setInterval(async () => {
+            attempts++;
+            journalLog(`Vérification de l'avancement (${attempts})...`, "info");
+            
+            try {
+                const pollResponse = await fetch(`https://apihub.agnes-ai.com/agnesapi?video_id=${videoId}&model_name=agnes-video-2.5`, {
+                    method: 'GET',
+                    headers: { 'Authorization': 'Bearer ' + apiKey }
+                });
+                
+                const pollData = await pollResponse.json();
+                
+                if (pollData.status === 'completed' || pollData.status === 'succeeded' || pollData.url) {
+                    clearInterval(checkInterval);
+                    const finalUrl = pollData.url || (pollData.data && pollData.data.url);
+                    if (finalUrl) {
+                        displayVideo(finalUrl);
+                    } else {
+                        throw new Error("Vidéo terminée mais URL introuvable.");
+                    }
+                } else if (pollData.status === 'failed') {
+                    clearInterval(checkInterval);
+                    throw new Error("La génération a échoué côté serveur.");
+                }
+            } catch (err) {
+                clearInterval(checkInterval);
+                journalLog("Erreur pendant la vérification: " + err.message, "error");
+                resetUI();
+            }
+            
+            if (attempts >= maxAttempts) {
+                clearInterval(checkInterval);
+                journalLog("Délai d'attente dépassé.", "error");
+                resetUI();
+            }
+        }, 5000); 
+
+    } catch (error) {
+        journalLog("Erreur : " + error.message, "error");
+        showToast("Erreur de génération", "error");
+        resetUI();
+    }
+}
+
+function displayVideo(url) {
+    document.getElementById('status-bar').classList.remove('visible');
+    document.getElementById('stop-btn').classList.remove('visible');
+    document.getElementById('generate-btn').style.display = 'block';
+    document.getElementById('video-placeholder').style.display = 'none';
+    document.getElementById('video-result').classList.remove('hidden');
+    
+    const vid = document.getElementById('result-video');
+    vid.src = url;
+    document.getElementById('result-meta').textContent = 'Vidéo générée par Agnes AI';
+    document.getElementById('download-video-link').href = url;
+    showToast('Vidéo générée !', 'success');
+    journalLog("Vidéo affichée avec succès !", "success");
+}
+
+function resetUI() {
+    document.getElementById('status-bar').classList.remove('visible');
+    document.getElementById('stop-btn').classList.remove('visible');
+    document.getElementById('generate-btn').style.display = 'block';
+    document.getElementById('video-placeholder').style.display = 'none';
+    showToast("Génération arrêtée ou échouée", "error");
+}
+</script>
+</body>
+</html>
