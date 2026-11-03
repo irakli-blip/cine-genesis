@@ -209,8 +209,10 @@ Le prompt assemblé apparaîtra ici au fur et à mesure de votre saisie…</div>
 <div class="debug-body" id="journal-body"></div>
 <div class="debug-body hidden" id="tech-body"></div>
 </div>
+
 <script>
 const API_KEYS_STORAGE = 'video_prompt_studio_keys_v1';
+const API_BASE = 'https://apihub.agnes-ai.com';
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function showToast(message,type='success'){const t=document.getElementById('toast');t.className='toast '+type+' visible';document.getElementById('toast-text').textContent=message;setTimeout(()=>t.classList.remove('visible'),3000)}
@@ -319,9 +321,6 @@ function updateKeyStatus(keysStr) {
 
 async function generateVideo() {
     const prompt = document.getElementById('prompt-preview').innerText.replace('Prompt complet\n', '').trim();
-    const ratio = document.getElementById('ratio-select').value;
-    const duration = document.getElementById('duration-select').value;
-    
     const keys = document.getElementById('api-keys-input').value.split('\n').map(k => k.trim()).filter(k => k);
     if (keys.length === 0) {
         showToast("Erreur : Aucune clé API", "error");
@@ -336,11 +335,12 @@ async function generateVideo() {
     document.getElementById('video-placeholder').style.display = 'flex';
     document.getElementById('video-result').classList.add('hidden');
     document.getElementById('status-bar').classList.add('visible');
-    document.getElementById('status-text').textContent = 'Envoi de la requête à Agnes AI...';
+    document.getElementById('status-text').textContent = 'Création de la tâche (30s à 2min)...';
     journalLog("Envoi de la requête à Agnes AI...");
 
     try {
-        const response = await fetch('https://apihub.agnes-ai.com/v1/videos', {
+        // 1. Créer la tâche (Format standard OpenAI Video)
+        const response = await fetch(`${API_BASE}/v1/videos`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -348,94 +348,30 @@ async function generateVideo() {
             },
             body: JSON.stringify({
                 model: "agnes-video-2.5",
-                prompt: prompt,
-                duration: parseInt(duration),
-                ratio: ratio
+                prompt: prompt
             })
         });
 
+        const data = await response.json();
+
         if (!response.ok) {
-            const errorData = await response.json().catch(()=> ({}));
-            throw new Error(`Erreur ${response.status}: ${errorData.message || 'Problème avec l\'API'}`);
+            throw new Error(`Erreur ${response.status}: ${data.message || data.error?.message || 'Problème avec l\'API'}`);
         }
 
-        const data = await response.json();
-        const videoId = data.id || data.video_id;
-        
+        const videoId = data.id;
         if (!videoId) throw new Error("L'API n'a pas renvoyé d'ID de vidéo.");
         
         journalLog("Tâche créée ! ID: " + videoId, "success");
-        document.getElementById('status-text').textContent = 'Génération en cours (peut prendre 1-2 min)...';
         
         let attempts = 0;
-        const maxAttempts = 60;
+        const maxAttempts = 60; // 60 x 5s = 5 minutes max
         
         const checkInterval = setInterval(async () => {
             attempts++;
-            journalLog(`Vérification de l'avancement (${attempts})...`, "info");
+            journalLog(`Vérification (${attempts}/${maxAttempts})...`, "info");
             
             try {
-                const pollResponse = await fetch(`https://apihub.agnes-ai.com/agnesapi?video_id=${videoId}&model_name=agnes-video-2.5`, {
+                // 2. Vérifier l'état de la tâche
+                const pollResponse = await fetch(`${API_BASE}/agnesapi?video_id=${videoId}&model_name=agnes-video-2.5`, {
                     method: 'GET',
-                    headers: { 'Authorization': 'Bearer ' + apiKey }
-                });
-                
-                const pollData = await pollResponse.json();
-                
-                if (pollData.status === 'completed' || pollData.status === 'succeeded' || pollData.url) {
-                    clearInterval(checkInterval);
-                    const finalUrl = pollData.url || (pollData.data && pollData.data.url);
-                    if (finalUrl) {
-                        displayVideo(finalUrl);
-                    } else {
-                        throw new Error("Vidéo terminée mais URL introuvable.");
-                    }
-                } else if (pollData.status === 'failed') {
-                    clearInterval(checkInterval);
-                    throw new Error("La génération a échoué côté serveur.");
-                }
-            } catch (err) {
-                clearInterval(checkInterval);
-                journalLog("Erreur pendant la vérification: " + err.message, "error");
-                resetUI();
-            }
-            
-            if (attempts >= maxAttempts) {
-                clearInterval(checkInterval);
-                journalLog("Délai d'attente dépassé.", "error");
-                resetUI();
-            }
-        }, 5000); 
-
-    } catch (error) {
-        journalLog("Erreur : " + error.message, "error");
-        showToast("Erreur de génération", "error");
-        resetUI();
-    }
-}
-
-function displayVideo(url) {
-    document.getElementById('status-bar').classList.remove('visible');
-    document.getElementById('stop-btn').classList.remove('visible');
-    document.getElementById('generate-btn').style.display = 'block';
-    document.getElementById('video-placeholder').style.display = 'none';
-    document.getElementById('video-result').classList.remove('hidden');
-    
-    const vid = document.getElementById('result-video');
-    vid.src = url;
-    document.getElementById('result-meta').textContent = 'Vidéo générée par Agnes AI';
-    document.getElementById('download-video-link').href = url;
-    showToast('Vidéo générée !', 'success');
-    journalLog("Vidéo affichée avec succès !", "success");
-}
-
-function resetUI() {
-    document.getElementById('status-bar').classList.remove('visible');
-    document.getElementById('stop-btn').classList.remove('visible');
-    document.getElementById('generate-btn').style.display = 'block';
-    document.getElementById('video-placeholder').style.display = 'none';
-    showToast("Génération arrêtée ou échouée", "error");
-}
-</script>
-</body>
-</html>
+                   
