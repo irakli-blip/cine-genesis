@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Générateur Vidéo — Prompts Structurés</title>
 <style>
+/* TON DESIGN MAGNIFIQUE EST ICI */
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--bg:#0a0a12;--bg2:#12121c;--bg3:#1a1a28;--panel:#16161f;--border:#2a2a3a;--ink:#e8e6e0;--dim:#8a8896;--faint:#4a4858;--acc:#e5c15a;--acc2:#e87b35;--ok:#4a9d6a;--err:#c85a4a;--r:6px;--fs:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;--fm:ui-monospace,'SF Mono',Menlo,monospace}
 html,body{background:var(--bg)}
@@ -13,38 +14,40 @@ header{margin-bottom:1.2rem;text-align:center;padding:1rem 0 1.4rem;position:rel
 header::after{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:180px;height:1px;background:linear-gradient(90deg,transparent,var(--acc),transparent);opacity:.5}
 h1{font-size:1.9rem;font-weight:300;margin-bottom:.4rem;background:linear-gradient(135deg,var(--acc2),var(--acc));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .subtitle{font-size:.85rem;color:var(--dim);font-style:italic}
-.banner{background:var(--panel);border:1px solid var(--border);border-left:2px solid var(--acc);padding:1rem 1.15rem;border-radius:var(--r);font-size:.8rem;color:var(--dim);margin-bottom:1.2rem;line-height:1.6}
-.banner strong{color:var(--ink)}.banner .hl{color:var(--acc)}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:1.2rem 1.3rem;margin-bottom:1rem}
+input[type=text],textarea{width:100%;padding:.85rem 1rem;border-radius:var(--r);border:1px solid var(--border);background:var(--bg2);color:var(--ink);font-family:var(--fm);font-size:.78rem;margin-bottom:.6rem}
+textarea{resize:vertical;min-height:70px;line-height:1.5;font-family:var(--fs);font-size:.85rem}
+.btn{width:100%;padding:.85rem 1.2rem;border-radius:var(--r);border:1px solid var(--border);background:var(--bg2);color:var(--ink);font-size:.85rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;margin-bottom:.7rem;transition:all .2s}
+.btn:hover:not(:disabled){background:var(--bg3);border-color:var(--acc)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn-primary{border-color:var(--acc);background:linear-gradient(135deg,rgba(232,123,53,.2),rgba(229,193,90,.15));color:var(--acc);font-size:1.05rem;padding:1.3rem;letter-spacing:.2em}
 .section{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);margin-bottom:1rem;overflow:hidden}
 .section-header{padding:1rem 1.2rem;cursor:pointer;user-select:none;display:flex;justify-content:space-between;align-items:center}
 .section-title{font-size:.85rem;text-transform:uppercase;letter-spacing:.2em;color:var(--ink);font-weight:500;display:flex;align-items:center;gap:.6rem}
-.badge{display:inline-block;padding:.15rem .55rem;background:transparent;color:var(--acc);border:1px solid var(--border);border-radius:2px;font-size:.6rem;letter-spacing:.15em;font-weight:600}
 .chevron{font-size:.7rem;color:var(--faint);transition:transform .3s}
 .section.open .chevron{transform:rotate(180deg);color:var(--acc)}
 .section-body{max-height:0;overflow:hidden;transition:max-height .4s ease}
 .section.open .section-body{max-height:12000px}
 .section-content{padding:0 1.2rem 1.2rem}
-.row{margin-bottom:1rem}
 .label{display:block;font-size:.72rem;color:var(--dim);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.15em;font-weight:600}
 .label b{color:var(--acc);font-weight:700;margin-right:.4rem}
-textarea,select{width:100%;padding:.85rem 1rem;border-radius:var(--r);border:1px solid var(--border);background:var(--bg2);color:var(--ink);font-family:var(--fm);font-size:.78rem;margin-bottom:.6rem}
-select{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%23e5c15a' d='M0 0l5 6 5-6z'/></svg>");background-repeat:no-repeat;background-position:right .95rem center;background-size:10px}
+select{width:100%;padding:.8rem .95rem;border-radius:var(--r);border:1px solid var(--border);background:var(--bg2);color:var(--ink);font-size:.88rem;appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%23e5c15a' d='M0 0l5 6 5-6z'/></svg>");background-repeat:no-repeat;background-position:right .95rem center;background-size:10px}
 .prompt-preview{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:1rem;font-family:var(--fm);font-size:.72rem;line-height:1.6;color:#a8d8b0;max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-word}
 .prompt-preview .pp-label{font-size:.62rem;color:var(--acc);letter-spacing:.15em;text-transform:uppercase;font-weight:700;margin-bottom:.4rem;display:block}
-.btn{width:100%;padding:.85rem 1.2rem;border-radius:var(--r);border:1px solid var(--border);background:var(--bg2);color:var(--ink);font-size:.85rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;margin-bottom:.7rem;transition:all .2s}
-.btn:hover{background:var(--bg3);border-color:var(--acc)}
-.btn-primary{border-color:var(--acc);background:linear-gradient(135deg,rgba(232,123,53,.2),rgba(229,193,90,.15));color:var(--acc);font-size:1.05rem;padding:1.3rem;letter-spacing:.2em}
+#journal{background:#000;color:#0f0;font-family:monospace;padding:1rem;height:150px;overflow-y:auto;margin-top:1rem;border:1px solid #333;font-size:12px;}
 @media(max-width:480px){h1{font-size:1.5rem}}
 </style>
 </head>
 <body>
+
 <header>
 <h1>Générateur Vidéo</h1>
 <p class="subtitle">Composez votre prompt structuré</p>
 </header>
 
-<div class="banner">
-<strong>Le prompt structuré :</strong> chaque vidéo est générée à partir de <span class="hl">6 couches</span>. Remplissez chaque champ, copiez le prompt, et collez-le sur le site d'Agnes.
+<div class="panel">
+<label class="label"><b>01</b> Clé API Agnes</label>
+<input type="text" id="api-keys-input" placeholder="sk-..." autocomplete="off">
 </div>
 
 <div class="section open" id="sec-subject">
@@ -74,10 +77,11 @@ select{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns=
 <div class="section-body"><div class="section-content">
 <div class="prompt-preview" id="prompt-preview"><span class="pp-label">Prompt complet</span>
 Remplissez les champs ci-dessus...</div>
-<button type="button" class="btn btn-primary" id="copy-prompt-btn" style="margin-top:.6rem;">📋 Copier le prompt</button>
-<a href="https://platform.agnes-ai.com" target="_blank" class="btn" style="text-align:center;text-decoration:none;display:block;margin-top:1rem;">🚀 Aller sur Agnes AI</a>
+<button type="button" class="btn btn-primary" id="generate-btn" style="margin-top:.6rem;">▶ GÉNÉRER LA VIDÉO</button>
 </div></div>
 </div>
+
+<div id="journal">Prêt...</div>
 
 <script>
 document.querySelectorAll('.section-header').forEach(h => {
@@ -98,17 +102,79 @@ function updatePrompt() {
     let p = [];
     if(subject) p.push(subject);
     if(action) p.push(action);
-    p.push(`Camera: ${shot}, ${move}`);
+    if(shot || move) p.push(`Camera: ${shot}, ${move}`);
     
-    const final = p.join('. ') + '.';
-    document.getElementById('prompt-preview').innerHTML = '<span class="pp-label">Prompt complet</span>\n' + final;
+    document.getElementById('prompt-preview').innerHTML = '<span class="pp-label">Prompt complet</span>\n' + p.join('. ') + (p.length ? '.' : '');
 }
 
-document.getElementById('copy-prompt-btn').addEventListener('click', () => {
-    const text = document.getElementById('prompt-preview').innerText.replace('Prompt complet\n', '').trim();
-    navigator.clipboard.writeText(text);
-    document.getElementById('copy-prompt-btn').innerText = "✅ Copié !";
-    setTimeout(() => document.getElementById('copy-prompt-btn').innerText = "📋 Copier le prompt", 2000);
+function log(msg, color = '#0f0') {
+    const j = document.getElementById('journal');
+    j.innerHTML += `<div style="color:${color}">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
+    j.scrollTop = j.scrollHeight;
+}
+
+document.getElementById('generate-btn').addEventListener('click', async () => {
+    const apiKey = document.getElementById('api-keys-input').value.trim();
+    const prompt = document.getElementById('prompt-preview').innerText.replace('Prompt complet\n', '').trim();
+    
+    if(!apiKey) { log("Erreur : Mets ta clé API !", "#ff5555"); return; }
+    if(!prompt || prompt === "Remplissez les champs ci-dessus...") { log("Erreur : Écris un sujet !", "#ff5555"); return; }
+
+    log("Envoi de la requête...", "#e5c15a");
+
+    try {
+        // L'URL corrigée (avec /generations)
+        const response = await fetch('https://apihub.agnes-ai.com/v1/video/generations', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + apiKey
+            },
+            body: JSON.stringify({
+                model: "agnes-video-2.5",
+                prompt: prompt
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            log("ERREUR API : " + JSON.stringify(data), "#ff5555");
+            return;
+        }
+
+        log("SUCCÈS ! Tâche créée. ID : " + data.id, "#55ff55");
+
+        let tentatives = 0;
+        const interval = setInterval(async () => {
+            tentatives++;
+            log("Attente... " + tentatives);
+
+            try {
+                const poll = await fetch(`https://apihub.agnes-ai.com/agnesapi?video_id=${data.id}&model_name=agnes-video-2.5`, {
+                    method: 'GET',
+                    headers: { 'Authorization': 'Bearer ' + apiKey }
+                });
+                
+                const pollData = await poll.json();
+                
+                if (pollData.status === 'completed' || pollData.url) {
+                    clearInterval(interval);
+                    log("VIDÉO PRÊTE !", "#55ff55");
+                    const url = pollData.url || pollData.data?.url;
+                    if(url) document.body.innerHTML += `<video src="${url}" controls autoplay style="width:100%;margin-top:1rem;"></video>`;
+                } else if (pollData.status === 'failed') {
+                    clearInterval(interval);
+                    log("ÉCHEC.", "#ff5555");
+                }
+            } catch(e) { log("Erreur vérif: " + e.message, "#ff5555"); }
+            
+            if (tentatives > 40) { clearInterval(interval); log("Trop long.", "#ff5555"); }
+        }, 5000);
+
+    } catch (error) {
+        log("Erreur réseau : " + error.message, "#ff5555");
+    }
 });
 </script>
 </body>
